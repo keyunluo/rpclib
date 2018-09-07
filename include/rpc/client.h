@@ -1,10 +1,14 @@
 #pragma once
 
 #include <future>
+#include <memory>
 
+#include "nonstd/optional.hpp"
+
+#include "rpc/config.h"
 #include "rpc/detail/log.h"
 #include "rpc/detail/pimpl.h"
-#include "msgpack.hpp"
+#include "rpc/msgpack.hpp"
 
 namespace rpc {
 
@@ -91,6 +95,26 @@ public:
     template <typename... Args>
     void send(std::string const &func_name, Args... args);
 
+    //! \brief Returns the timeout setting of this client in milliseconds.
+    //!
+    //! The timeout is applied to synchronous calls. If the timeout expires
+    //! without receiving a response from the server, rpc::timeout exception
+    //! will be thrown.
+    //!
+    //! \note The timeout has no effect on async calls. For those,
+    //! the preferred timeout mechanism remains using std::future.
+    //!
+    //! The default value for timeout is 5000ms (5 seconds).
+    nonstd::optional<int64_t> get_timeout() const;
+
+    //! \brief Sets the timeout for synchronous calls. For more information,
+    //! see get_timeout().
+    void set_timeout(int64_t value);
+
+    //! \brief Clears the timeout for synchronous calls. For more information,
+    //! see get_timeout().
+    void clear_timeout();
+
     //! \brief Enum representing the connection states of the client.
     enum class connection_state { initial, connected, disconnected, reset };
 
@@ -112,11 +136,11 @@ private:
               std::shared_ptr<rsp_promise> p);
     void post(RPCLIB_MSGPACK::sbuffer *buffer);
     int get_next_call_idx();
+    RPCLIB_NORETURN void throw_timeout(std::string const& func_name);
 
 private:
-    static constexpr uint32_t default_buffer_size = 65535;
-    static constexpr double buffer_grow_factor = 1.5;
-    RPCLIB_DECL_PIMPL(768)
+    static constexpr double buffer_grow_factor = 1.8;
+    RPCLIB_DECLARE_PIMPL()
 };
 }
 

@@ -15,15 +15,23 @@ pages:
     - 'Roadmap': 'roadmap.md'
   - 'Contributing': 'contributing.md'
   - 'Reference': 'reference.md'
+  - 'Versions': 'versions.md'
 
-theme_dir: rpclib-cinder
-extra_css: ['extra.css']
+theme: material
 
 markdown_extensions:
   - toc:
       permalink: False
-      baselevel: 1
+      baselevel: 2
   - admonition
   - attr_list
+  - codehilite
+  - pymdownx.magiclink
 
 copyright: "Copyright &copy; 2016 Tamás Szelei"
+
+extra_css:
+  - 'extra.css'
+
+repo_name: 'rpclib/rpclib'
+repo_url: 'https://github.com/rpclib/rpclib'

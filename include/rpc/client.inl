@@ -5,7 +5,13 @@ RPCLIB_MSGPACK::object_handle client::call(std::string const &func_name,
                                     Args... args) {
     RPCLIB_CREATE_LOG_CHANNEL(client)
     auto future = async_call(func_name, std::forward<Args>(args)...);
-    future.wait();
+    if (auto timeout = get_timeout()) {
+        auto wait_result = future.wait_for(std::chrono::milliseconds(*timeout));
+        if (wait_result == std::future_status::timeout) {
+            throw_timeout(func_name);
+        }
+    }
+
     return future.get();
 }
 

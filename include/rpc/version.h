@@ -1,10 +1,14 @@
 #pragma once
 
-#ifndef VERSION_H_UMZFBKB4
-#define VERSION_H_UMZFBKB4
+#ifndef VERSION_H_IN_LZK5UJ7E
+#define VERSION_H_IN_LZK5UJ7E
 
-#define RPCLIB_VERSION_MAJOR 1
-#define RPCLIB_VERSION_MINOR 0
-#define RPCLIB_VERSION_BUILD 0
+namespace rpc {
 
-#endif /* end of include guard: VERSION_H_UMZFBKB4 */
+static constexpr unsigned VERSION_MAJOR = 2;
+static constexpr unsigned VERSION_MINOR = 2;
+static constexpr unsigned VERSION_PATCH = 0;
+
+} /* rpc */
+
+#endif /* end of include guard: VERSION_H_IN_LZK5UJ7E */

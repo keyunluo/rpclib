@@ -1,5 +1,3 @@
-# Cookbook
-
 Welcome to the Cookbook! This is a collection of short examples that allows you to quickly learn
 the ins and outs of `rpclib`. This guide is written in the spirit of "less talk and more code" (it's mostly only the titles, but also look out for the comments, they contain important information).
 If you prefer detailed instructions and explanation, you might want to start with the
@@ -272,6 +270,27 @@ int main() {
 }
 ```
 
+### Storing per-session data
+
+```cpp
+#include <unordered_map>
+#include "rpc/server.h"
+#include "rpc/this_session.h"
+
+int main() {
+    rpc::server srv(8080); // listen on TCP port 8080
+    std::unordered_map<rpc::session_id_t, std::string> data;
+
+    srv.bind("store_me_maybe", [](std::string const& value) {
+        auto id = rpc::this_session().id();
+        data[id] = value;
+    });
+
+    srv.run(); // blocking call
+    return 0;
+}
+```
+
 ## Client examples
 
 ### Creating a client
@@ -329,7 +348,7 @@ int main() {
 int main() {
     rpc::client c("127.0.0.1", 8080);
 
-    auto a_future = c.call_async("add", 2, 3); // non-blocking, returns std::future
+    auto a_future = c.async_call("add", 2, 3); // non-blocking, returns std::future
 
     std::cout << "I can do something here immediately" << std::endl;
 
@@ -347,6 +366,29 @@ int main() {
 int main() {
     rpc::client c("127.0.0.1", 8080);
     client::connection_state cs = c.get_connection_state();
+
+    return 0;
+}
+```
+
+### Applying a timeout to synchronous calls
+
+```cpp
+#include "rpc/client.h"
+
+int main() {
+    rpc::client c("127.0.0.1", 8080);
+
+    try {
+        // default timeout is 5000 milliseconds
+        const uint64_t short_timeout = 50;
+        client.set_timeout(short_timeout);
+        client.call("sleep", short_timeout + 10);
+    } catch (rpc::timeout &t) {
+        // will display a message like
+        // rpc::timeout: Timeout of 50ms while calling RPC function 'sleep'
+        std::cout << t.what() << std::endl;
+    }
 
     return 0;
 }

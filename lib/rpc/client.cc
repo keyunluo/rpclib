@@ -1,4 +1,5 @@
 #include "rpc/client.h"
+#include "rpc/config.h"
 #include "rpc/rpc_error.h"
 
 #include <atomic>
@@ -22,6 +23,8 @@ using namespace rpc::detail;
 
 namespace rpc {
 
+static constexpr uint32_t default_buffer_size = rpc::constants::DEFAULT_BUFFER_SIZE;
+
 struct client::impl {
     impl(client *parent, std::string const &addr, uint16_t port)
         : parent_(parent),
@@ -33,7 +36,8 @@ struct client::impl {
           is_connected_(false),
           state_(client::connection_state::initial),
           writer_(std::make_shared<detail::async_writer>(
-              &io_, RPCLIB_ASIO::ip::tcp::socket(io_))) {
+              &io_, RPCLIB_ASIO::ip::tcp::socket(io_))),
+          timeout_(nonstd::nullopt) {
         pac_.reserve_buffer(default_buffer_size);
     }
 
@@ -57,38 +61,45 @@ struct client::impl {
 
     void do_read() {
         LOG_TRACE("do_read");
+        constexpr std::size_t max_read_bytes = default_buffer_size;
         writer_->socket_.async_read_some(
-            RPCLIB_ASIO::buffer(pac_.buffer(), default_buffer_size),
-            [this](std::error_code ec, std::size_t length) {
+            RPCLIB_ASIO::buffer(pac_.buffer(), max_read_bytes),
+            // I don't think max_read_bytes needs to be captured explicitly
+            // (since it's constexpr), but MSVC insists.
+            [this, max_read_bytes](std::error_code ec, std::size_t length) {
                 if (!ec) {
-                    pac_.buffer_consumed(length);
-                    if (length >= pac_.buffer_capacity()) {
-                        auto new_size = static_cast<std::size_t>(
-                            pac_.buffer_capacity() * buffer_grow_factor);
-                        LOG_INFO("Resizing buffer to {}", new_size);
-                        pac_.reserve_buffer(new_size);
-                    }
-
                     LOG_TRACE("Read chunk of size {}", length);
+                    pac_.buffer_consumed(length);
+
                     RPCLIB_MSGPACK::unpacked result;
-                    while (pac_.next(&result)) {
+                    while (pac_.next(result)) {
                         auto r = response(std::move(result));
                         auto id = r.get_id();
-                        auto &c = ongoing_calls_[id];
+                        auto &current_call = ongoing_calls_[id];
                         try {
                             if (r.get_error()) {
-                                throw rpc_error(
-                                    "rpc::rpc_error during call",
-                                    std::get<0>(c), RPCLIB_MSGPACK::clone(r.get_error()->get()));
+                                throw rpc_error("rpc::rpc_error during call",
+                                                std::get<0>(current_call),
+                                                r.get_error());
                             }
-                            std::get<1>(c).set_value(
-                                std::move(*r.get_result()));
+                            std::get<1>(current_call)
+                                .set_value(std::move(*r.get_result()));
                         } catch (...) {
-                            std::get<1>(c).set_exception(
-                                std::current_exception());
+                            std::get<1>(current_call)
+                                .set_exception(std::current_exception());
                         }
                         strand_.post(
                             [this, id]() { ongoing_calls_.erase(id); });
+                    }
+
+                    // resizing strategy: if the remaining buffer size is
+                    // less than the maximum bytes requested from asio,
+                    // then request max_read_bytes. This prompts the unpacker
+                    // to resize its buffer doubling its size
+                    // (https://github.com/msgpack/msgpack-c/issues/567#issuecomment-280810018)
+                    if (pac_.buffer_capacity() < max_read_bytes) {
+                        LOG_TRACE("Reserving extra buffer: {}", max_read_bytes);
+                        pac_.reserve_buffer(max_read_bytes);
                     }
                     do_read();
                 } else if (ec == RPCLIB_ASIO::error::eof) {
@@ -97,11 +108,13 @@ struct client::impl {
                 } else if (ec == RPCLIB_ASIO::error::connection_reset) {
                     // Yes, this should be connection_state::reset,
                     // but on windows, disconnection results in reset. May be
-                    // asio bug, may be a windows socket pecularity. Should be investigated later.
+                    // asio bug, may be a windows socket pecularity. Should be
+                    // investigated later.
                     state_ = client::connection_state::disconnected;
                     LOG_WARN("The connection was reset.");
                 } else {
-                    LOG_ERROR("Unhandled error code: {}", ec);
+                    LOG_ERROR("Unhandled error code: {} | '{}'", ec,
+                              ec.message());
                 }
             });
     }
@@ -110,9 +123,24 @@ struct client::impl {
 
     //! \brief Waits for the write queue and writes any buffers to the network
     //! connection. Should be executed throught strand_.
-    void write(RPCLIB_MSGPACK::sbuffer item) { writer_->write(std::move(item)); }
+    void write(RPCLIB_MSGPACK::sbuffer item) {
+        writer_->write(std::move(item));
+    }
 
-    using call_t = std::pair<std::string, std::promise<RPCLIB_MSGPACK::object_handle>>;
+    nonstd::optional<int64_t> get_timeout() {
+        return timeout_;
+    }
+
+    void set_timeout(int64_t value) {
+        timeout_ = value;
+    }
+
+    void clear_timeout() {
+        timeout_ = nonstd::nullopt;
+    }
+
+    using call_t =
+        std::pair<std::string, std::promise<RPCLIB_MSGPACK::object_handle>>;
 
     client *parent_;
     RPCLIB_ASIO::io_service io_;
@@ -128,11 +156,12 @@ struct client::impl {
     std::thread io_thread_;
     std::atomic<client::connection_state> state_;
     std::shared_ptr<detail::async_writer> writer_;
+    nonstd::optional<int64_t> timeout_;
     RPCLIB_CREATE_LOG_CHANNEL(client)
 };
 
 client::client(std::string const &addr, uint16_t port)
-    : pimpl(this, addr, port) {
+    : pimpl(new client::impl(this, addr, port)) {
     tcp::resolver resolver(pimpl->io_);
     auto endpoint_it =
         resolver.resolve({pimpl->addr_, std::to_string(pimpl->port_)});
@@ -148,7 +177,17 @@ client::client(std::string const &addr, uint16_t port)
 void client::wait_conn() {
     std::unique_lock<std::mutex> lock(pimpl->mut_connection_finished_);
     if (!pimpl->is_connected_) {
-        pimpl->conn_finished_.wait(lock);
+        if (auto timeout = pimpl->timeout_) {
+            auto result = pimpl->conn_finished_.wait_for(
+                lock, std::chrono::milliseconds(*timeout));
+            if (result == std::cv_status::timeout) {
+                throw rpc::timeout(RPCLIB_FMT::format(
+                    "Timeout of {}ms while connecting to {}:{}", *get_timeout(),
+                    pimpl->addr_, pimpl->port_));
+            }
+        } else {
+            pimpl->conn_finished_.wait(lock);
+        }
     }
 }
 
@@ -178,14 +217,33 @@ client::connection_state client::get_connection_state() const {
     return pimpl->get_connection_state();
 }
 
+nonstd::optional<int64_t> client::get_timeout() const {
+    return pimpl->get_timeout();
+}
+
+void client::set_timeout(int64_t value) {
+    pimpl->set_timeout(value);
+}
+
+void client::clear_timeout() {
+    pimpl->clear_timeout();
+}
+
 void client::wait_all_responses() {
     for (auto &c : pimpl->ongoing_calls_) {
         c.second.second.get_future().wait();
     }
 }
 
+RPCLIB_NORETURN void client::throw_timeout(std::string const& func_name) {
+    throw rpc::timeout(
+        RPCLIB_FMT::format("Timeout of {}ms while calling RPC function '{}'",
+                           *get_timeout(), func_name));
+}
+
 client::~client() {
     pimpl->io_.stop();
     pimpl->io_thread_.join();
 }
+
 }

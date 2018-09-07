@@ -162,7 +162,7 @@ TEST_F(dispatch_test, argcount_verified_void_nonzero_arg_too_many) {
 
 TEST_F(dispatch_test, unbound_func_error_response) {
     dispatcher.bind("foo", &dummy_void_singlearg);
-    auto msg = make_unpacked(0, 0, "bar", RPCLIB_MSGPACK::type::nil());
+    auto msg = make_unpacked(0, 0, "bar", RPCLIB_MSGPACK::type::nil_t());
     auto response = dispatcher.dispatch(msg.get());
     EXPECT_TRUE(response.get_error() !=
                 std::shared_ptr<RPCLIB_MSGPACK::object_handle>());
@@ -172,5 +172,20 @@ TEST_F(dispatch_test, bad_format_msgpack_returns_empty) {
     auto msg = make_unpacked(1, 2, 3, 4, 5); // 5 items is breaking the protocol
     auto response = dispatcher.dispatch(msg.get());
     EXPECT_TRUE(response.is_empty());
+}
+
+TEST_F(dispatch_test, unique_names_zeroarg) {
+    dispatcher.bind("foo", &dummy_void_zeroarg);
+    EXPECT_THROW(dispatcher.bind("foo", &dummy_void_zeroarg), std::logic_error);
+}
+
+TEST_F(dispatch_test, unique_names_singlearg) {
+    dispatcher.bind("foo", &dummy_void_singlearg);
+    EXPECT_THROW(dispatcher.bind("foo", &dummy_void_singlearg), std::logic_error);
+}
+
+TEST_F(dispatch_test, unique_names_multiarg) {
+    dispatcher.bind("foo", &dummy_void_multiarg);
+    EXPECT_THROW(dispatcher.bind("foo", &dummy_void_multiarg), std::logic_error);
 }
 

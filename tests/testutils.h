@@ -4,7 +4,7 @@
 #define TESTUTILS_H_LHCAMVUX
 
 #include "gmock/gmock.h"
-#include "msgpack.hpp"
+#include "rpc/msgpack.hpp"
 #include <regex>
 #include <thread>
 #include <tuple>
@@ -18,9 +18,7 @@ inline RPCLIB_MSGPACK::unpacked make_unpacked(Types... items) {
     auto obj = std::make_tuple(items...);
     RPCLIB_MSGPACK::sbuffer buf;
     RPCLIB_MSGPACK::pack(buf, obj);
-    RPCLIB_MSGPACK::unpacked msg;
-    RPCLIB_MSGPACK::unpack(&msg, buf.data(), buf.size());
-    return msg;
+    return RPCLIB_MSGPACK::unpack(buf.data(), buf.size());
 }
 
 //! \brief Creates a packed messagepack containing its arguments and returns the
@@ -50,6 +48,16 @@ struct MockDummy : IDummy {
     MOCK_METHOD1(dummy_void_singlearg, void(int));
     MOCK_METHOD2(dummy_void_multiarg, void(int, int));
 };
+
+inline std::string get_blob(std::size_t size) {
+    std::string s;
+    s.resize(size);
+    for (auto &c : s) {
+        c = static_cast<unsigned char>(rand() % 256);
+    }
+    return s;
+}
+
 }
 }
 

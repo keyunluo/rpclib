@@ -8,8 +8,6 @@
         width: 230px;
     }​
 </style>
-# Reference
-
 This document is a detailed and (hopefully) complete reference of the public interface of `rpclib`.
 For a tutorial, take a look at the [Primer](primer.md). Also, you can find many examples in the [Cookbook](cookbook.md).
 
@@ -32,10 +30,13 @@ Use this class to connect to msgpack-rpc servers and call their exposed function
 |---------|-------------|
 |  | [client](#classrpc_1_1client_1aafbcbb90607bb189bf75a2020ee14eb8)(std::string const &addr, uint16_t port)
 |  | [~client](#classrpc_1_1client_1a87e0788aaa7a95dfc0e1b9c15dfe4163)()
-| msgpack::object_handle | [call](#classrpc_1_1client_1a97f1406c306d8d6abff5f5a2e455ab72)(std::string const &func_name, Args...args)
-| std::future< msgpack::object_handle > | [async_call](#classrpc_1_1client_1a786fcf533f716b1f75deed60452bb75c)(std::string const &func_name, Args...args)
-| void | [send](#classrpc_1_1client_1a668d7e045da563fe4855df9c6b7a0737)(std::string const &func_name, Args...args)
-| connection_state | [get_connection_state](#classrpc_1_1client_1a109a04851e70742f53549f4039de21a7)() const 
+| RPCLIB_MSGPACK::object_handle | [call](#classrpc_1_1client_1aedc166b5a80820be198ef134f522b049)(std::string const &func_name, Args... args)
+| std::future< RPCLIB_MSGPACK::object_handle > | [async_call](#classrpc_1_1client_1a2e3702a314c8c0a00bfac652b82d16cc)(std::string const &func_name, Args... args)
+| void | [send](#classrpc_1_1client_1a5f5ad1d1d0630178a51ae219cd831b44)(std::string const &func_name, Args... args)
+| nonstd::optional< int64_t > | [get_timeout](#classrpc_1_1client_1a2c264af4d7169574452b9f968ffde87d)() const
+| void | [set_timeout](#classrpc_1_1client_1af890e3067745861642e2ba1a65bebce6)(int64_t value)
+| void | [clear_timeout](#classrpc_1_1client_1a89eeffaf87bf0470a65c9c8ca40562bb)()
+| connection_state | [get_connection_state](#classrpc_1_1client_1a710037bce0d9b80127a98eb6cd54caf1)() const
 | void | [wait_all_responses](#classrpc_1_1client_1ac37437bc05b70588c079079b957eb15f)()
 
 
@@ -66,9 +67,9 @@ Destructor.
 During destruction, the connection to the server is gracefully closed. This means that any outstanding reads and writes are completed first. 
 
 
-<h4 id="classrpc_1_1client_1a97f1406c306d8d6abff5f5a2e455ab72" class="doxy">rpc::client::call</h4>
+<h4 id="classrpc_1_1client_1aedc166b5a80820be198ef134f522b049" class="doxy">rpc::client::call</h4>
 ```cpp
-msgpack::object_handle rpc::client::call(std::string const &func_name, Args...args);
+RPCLIB_MSGPACK::object_handle rpc::client::call(std::string const &func_name, Args... args);
 ```
 
 Calls a function with the given name and arguments (if any). 
@@ -82,12 +83,12 @@ Calls a function with the given name and arguments (if any).
 `args` A variable number of arguments to pass to the called function.
 
 ##### Return value
-A msgpack::object containing the result of the function (if any). To obtain a typed value, use the msgpack API.
+A RPCLIB_MSGPACK::object containing the result of the function (if any). To obtain a typed value, use the msgpack API.
 
 
-<h4 id="classrpc_1_1client_1a786fcf533f716b1f75deed60452bb75c" class="doxy">rpc::client::async_call</h4>
+<h4 id="classrpc_1_1client_1a2e3702a314c8c0a00bfac652b82d16cc" class="doxy">rpc::client::async_call</h4>
 ```cpp
-std::future< msgpack::object_handle > rpc::client::async_call(std::string const &func_name, Args...args);
+std::future< RPCLIB_MSGPACK::object_handle > rpc::client::async_call(std::string const &func_name, Args... args);
 ```
 
 Calls a function asynchronously with the given name and arguments. 
@@ -104,12 +105,12 @@ Calls a function asynchronously with the given name and arguments.
 A call is performed asynchronously in the context of the client, i.e. this is not to be confused with parallel execution on the server. This function differs from `call` in that it does not wait for the result of the function. Instead, it returns a std::future that can be used to retrieve the result later.
 
 ##### Return value
-A std::future, possibly holding a future result (which is a msgpack::object). 
+A std::future, possibly holding a future result (which is a RPCLIB_MSGPACK::object). 
 
 
-<h4 id="classrpc_1_1client_1a668d7e045da563fe4855df9c6b7a0737" class="doxy">rpc::client::send</h4>
+<h4 id="classrpc_1_1client_1a5f5ad1d1d0630178a51ae219cd831b44" class="doxy">rpc::client::send</h4>
 ```cpp
-void rpc::client::send(std::string const &func_name, Args...args);
+void rpc::client::send(std::string const &func_name, Args... args);
 ```
 
 Sends a notification with the given name and arguments (if any). 
@@ -128,9 +129,38 @@ Notifications are a special kind of calls. They can be used to notify the server
 !!! warn
     This function returns immediately (possibly before the notification is written to the socket).
 
-<h4 id="classrpc_1_1client_1a109a04851e70742f53549f4039de21a7" class="doxy">rpc::client::get_connection_state</h4>
+<h4 id="classrpc_1_1client_1a2c264af4d7169574452b9f968ffde87d" class="doxy">rpc::client::get_timeout</h4>
 ```cpp
-connection_state rpc::client::get_connection_state() const ;
+nonstd::optional< int64_t > rpc::client::get_timeout() const;
+```
+
+Returns the timeout setting of this client in milliseconds. 
+
+##### Details
+The timeout is applied to synchronous calls. If the timeout expires without receiving a response from the server, 
+
+!!! warn
+    The timeout has no effect on async calls. For those, the preferred timeout mechanism remains using std::future.
+
+<h4 id="classrpc_1_1client_1af890e3067745861642e2ba1a65bebce6" class="doxy">rpc::client::set_timeout</h4>
+```cpp
+void rpc::client::set_timeout(int64_t value);
+```
+
+Sets the timeout for synchronous calls. For more information, see 
+
+
+<h4 id="classrpc_1_1client_1a89eeffaf87bf0470a65c9c8ca40562bb" class="doxy">rpc::client::clear_timeout</h4>
+```cpp
+void rpc::client::clear_timeout();
+```
+
+Clears the timeout for synchronous calls. For more information, see 
+
+
+<h4 id="classrpc_1_1client_1a710037bce0d9b80127a98eb6cd54caf1" class="doxy">rpc::client::get_connection_state</h4>
+```cpp
+connection_state rpc::client::get_connection_state() const;
 ```
 
 Returns the current connection state. 
@@ -160,21 +190,21 @@ This type allows clients to handle arbitrary error objects as the msgpack-rpc sp
 
 | | |
 |---------|-------------|
-| std::string | [get_function_name](#classrpc_1_1rpc__error_1a54f9582763c4efd63d7b85232333cd71)() const 
-| msgpack::object_handle & | [get_error](#classrpc_1_1rpc__error_1a2ba49857c07928d4f436d1bab0444e66)()
+| std::string | [get_function_name](#classrpc_1_1rpc__error_1ac45388bcde0a436b888c907015df01e2)() const
+| RPCLIB_MSGPACK::object_handle & | [get_error](#classrpc_1_1rpc__error_1a88ab8f211393ae62813042a797c08663)()
 
 
-<h4 id="classrpc_1_1rpc__error_1a54f9582763c4efd63d7b85232333cd71" class="doxy">rpc::rpc_error::get_function_name</h4>
+<h4 id="classrpc_1_1rpc__error_1ac45388bcde0a436b888c907015df01e2" class="doxy">rpc::rpc_error::get_function_name</h4>
 ```cpp
-std::string rpc::rpc_error::get_function_name() const ;
+std::string rpc::rpc_error::get_function_name() const;
 ```
 
 Returns the name of the function that was called on the server while the error occurred. 
 
 
-<h4 id="classrpc_1_1rpc__error_1a2ba49857c07928d4f436d1bab0444e66" class="doxy">rpc::rpc_error::get_error</h4>
+<h4 id="classrpc_1_1rpc__error_1a88ab8f211393ae62813042a797c08663" class="doxy">rpc::rpc_error::get_error</h4>
 ```cpp
-msgpack::object_handle & rpc::rpc_error::get_error();
+RPCLIB_MSGPACK::object_handle & rpc::rpc_error::get_error();
 ```
 
 Returns the error object that the server provided. 
@@ -190,15 +220,17 @@ Returns the error object that the server provided.
 
 Implements a msgpack-rpc server. This is the main interfacing point with the library for creating servers. 
 
-The server maintains a registry of function bindings that it uses to dispatch calls. It also takes care of managing worker threads and TCP connections. The server does not start listening right after construction in order to allow binding functions before that. Use the `run` or `async_run` functions to start listening on the port. 
+The server maintains a registry of function bindings that it uses to dispatch calls. It also takes care of managing worker threads and TCP connections. The server does not start listening right after construction in order to allow binding functions before that. Use the `run` or `async_run` functions to start listening on the port. This class is not copyable, but moveable. 
 
 ### Public functions
 
 | | |
 |---------|-------------|
 |  | [server](#classrpc_1_1server_1ac406b44f73cf2ff17240c0cd926a9c1e)(uint16_t port)
+|  | [server](#classrpc_1_1server_1a744b961d3b151b3449a4e0da37bd471a)(server &&other) noexcept
 |  | [server](#classrpc_1_1server_1ad71ffce076d752e116cefa3672e5d188)(std::string const &address, uint16_t port)
 |  | [~server](#classrpc_1_1server_1a20b9197e5ef1a22371e6fbdb7f58b330)()
+| server | [operator=](#classrpc_1_1server_1ac3cf4848fc3969cd26ba5e3bd2dc411b)(server &&other)
 | void | [run](#classrpc_1_1server_1a981d7e4a08d04d05cbac6770fab0dff8)()
 | void | [async_run](#classrpc_1_1server_1a462e032fa21cad78eeacc27da103a2b7)(std::size_t worker_threads=1)
 | void | [bind](#classrpc_1_1server_1a072135629430df6d5576416806f7b02c)(std::string const &name, F func)
@@ -218,6 +250,17 @@ Constructs a server that listens on the localhost on the specified port.
 `port` The port number to listen on. 
 
 
+<h4 id="classrpc_1_1server_1a744b961d3b151b3449a4e0da37bd471a" class="doxy">rpc::server::server</h4>
+```cpp
+ rpc::server::server(server &&other) noexcept;
+```
+
+Move constructor. This is implemented by calling the move assignment operator. 
+
+##### Parameters
+`other` The other instance to move from. 
+
+
 <h4 id="classrpc_1_1server_1ad71ffce076d752e116cefa3672e5d188" class="doxy">rpc::server::server</h4>
 ```cpp
  rpc::server::server(std::string const &address, uint16_t port);
@@ -226,6 +269,8 @@ Constructs a server that listens on the localhost on the specified port.
 Constructs a server that listens on the specified address on the specified port. 
 
 ##### Parameters
+`address` The address to bind to. This only works if oee of your network adapaters control the given address. 
+
 `port` The port number to listen on. 
 
 
@@ -240,6 +285,20 @@ Destructor.
 When the server is destroyed, all ongoin sessions are closed gracefully. 
 
 
+<h4 id="classrpc_1_1server_1ac3cf4848fc3969cd26ba5e3bd2dc411b" class="doxy">rpc::server::operator=</h4>
+```cpp
+server rpc::server::operator=(server &&other);
+```
+
+Move assignment operator. 
+
+##### Parameters
+`other` The other instance to move from. 
+
+##### Return value
+The result of the assignment. 
+
+
 <h4 id="classrpc_1_1server_1a981d7e4a08d04d05cbac6770fab0dff8" class="doxy">rpc::server::run</h4>
 ```cpp
 void rpc::server::run();
@@ -248,7 +307,7 @@ void rpc::server::run();
 Starts the server loop. This is a blocking call. 
 
 ##### Details
-First and foremost, running the event loop causes the server to start listening on the specified port. Also, as connections are established and calls are made by clients, the server executes the calls as part of this call. This means that the handlers are executed on the thread that calls `run`. Reads and writes are initiated by this function 
+First and foremost, running the event loop causes the server to start listening on the specified port. Also, as connections are established and calls are made by clients, the server executes the calls as part of this call. This means that the handlers are executed on the thread that calls `run`. Reads and writes are initiated by this function internally as well. 
 
 
 <h4 id="classrpc_1_1server_1a462e032fa21cad78eeacc27da103a2b7" class="doxy">rpc::server::async_run</h4>
@@ -444,6 +503,7 @@ Encapsulates information about the server session/connection this handler is run
 | | |
 |---------|-------------|
 | void | [post_exit](#classrpc_1_1this__session__t_1ae0551bc44674bdd43e33a4d4a36781b0)()
+| session_id_t | [id](#classrpc_1_1this__session__t_1aada2250ec9dd3d88781ca16eb4352047)() const
 
 
 <h4 id="classrpc_1_1this__session__t_1ae0551bc44674bdd43e33a4d4a36781b0" class="doxy">rpc::this_session_t::post_exit</h4>
@@ -455,5 +515,42 @@ Gracefully exits the session (i.e. ongoing writes and reads are completed; queue
 
 !!! warn
     Use this function if you need to close the connection from a handler. 
+
+<h4 id="classrpc_1_1this__session__t_1aada2250ec9dd3d88781ca16eb4352047" class="doxy">rpc::this_session_t::id</h4>
+```cpp
+session_id_t rpc::this_session_t::id() const;
+```
+
+Returns an ID that uniquely identifies a session. 
+
+!!! warn
+    This is not an ID for the client. If the client disconnects and reconnects, this ID may change. That being said, you can use this ID to store client-specific information *for the duration of the session. 
+
+
+## rpc::timeout
+
+```cpp
+#include "rpc/rpc_error.h"
+```
+### Description
+
+This exception is thrown by the client when either the connection or a call takes more time than it is set in set_timeout. 
+
+
+
+### Public functions
+
+| | |
+|---------|-------------|
+| const char * | [what](#classrpc_1_1timeout_1ad782f083798c650188b5927a226c3b04)() const noexcept override
+
+
+<h4 id="classrpc_1_1timeout_1ad782f083798c650188b5927a226c3b04" class="doxy">rpc::timeout::what</h4>
+```cpp
+const char * rpc::timeout::what() const noexcept override;
+```
+
+Describes the exception. 
+
 
 

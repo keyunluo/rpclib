@@ -1,5 +1,3 @@
-# Contributing
-
 This project is MIT-licensed and the development is open. All contributions are welcome. This
 document provides information on why, how and what to contribute.
 
@@ -82,7 +80,7 @@ contribution option, because the guidelines are less strict regarding these.
 
 `rpclib` aims to have an exemplary quality documenation. I'm not a native speaker, so it's likely
 that there are sentences with weird constructs, misspelled words or just typos in many places.
-Correcting those are invaluable help for me. To top it off, there is always room to exapnd, clean
+Correcting those are invaluable help for me. To top it off, there is always room to expand, clean
 up and just generally improve the documentation to provide an easy learning curve for new users of
 the library.
 

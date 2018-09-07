@@ -4,7 +4,7 @@
 #define ASYNC_WRITER_H_HQIRH28I
 
 #include "asio.hpp"
-#include "msgpack.hpp"
+#include "rpc/msgpack.hpp"
 #include <condition_variable>
 #include <deque>
 #include <memory>
@@ -49,8 +49,15 @@ public:
 
                     if (exit_) {
                         LOG_INFO("Closing socket");
-                        socket_.shutdown(
-                            RPCLIB_ASIO::ip::tcp::socket::shutdown_both);
+                        try {
+                            socket_.shutdown(
+                                RPCLIB_ASIO::ip::tcp::socket::shutdown_both);
+                        }
+                        catch (std::system_error &e) {
+                            (void)e;
+                            LOG_WARN("std::system_error during socket shutdown. "
+                                     "Code: {}. Message: {}", e.code(), e.what());
+                        }
                         socket_.close();
                     }
                 }));
@@ -66,6 +73,12 @@ public:
     }
 
     friend class rpc::client;
+
+protected:
+    template <typename Derived>
+    std::shared_ptr<Derived> shared_from_base() {
+        return std::static_pointer_cast<Derived>(shared_from_this());
+    }
 
 protected:
     RPCLIB_ASIO::ip::tcp::socket socket_;

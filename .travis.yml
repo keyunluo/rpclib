@@ -1,45 +1,36 @@
+language: c++
+os: linux 
 dist: trusty
-language: cpp
-compiler:
-  #- clang
-  - g++
+sudo: required
 
-branches:
-  only:
-    - master
-    - dev
+matrix:
+  include:
+    - compiler: gcc
+      env: RPCLIB_CXX_STANDARD=11 BUILD_TYPE=Release COVERAGE="ON"
+    - compiler: gcc
+      env: RPCLIB_CXX_STANDARD=14 BUILD_TYPE=Release COVERAGE="OFF"
+    - compiler: clang
+      env: RPCLIB_CXX_STANDARD=11 BUILD_TYPE=Release COVERAGE="OFF"
+    - compiler: clang
+      env: RPCLIB_CXX_STANDARD=14 BUILD_TYPE=Release COVERAGE="OFF"
 
-env:
-  global:
-    - CI_HOME=`pwd`
-
-addons:
-  apt:
-    sources:
-      - ubuntu-toolchain-r-test
-      - llvm-toolchain-precise-3.7
-      - george-edison55-precise-backports
-    packages:
-      - gcc-5
-      - g++-5
-      - cmake
-      - cmake-data
+before_install:
+  - sudo add-apt-repository -y ppa:ubuntu-toolchain-r/test
+  - sudo apt-get update -qq
 
 install:
-  - pip install --user cpp-coveralls
-  - if [ "$CXX" = "g++" ]; then export CXX="g++-5" CC="gcc-5"; fi
+  - sudo apt-get install -qq g++-5
+  - sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-5 90
+  - wget https://cmake.org/files/v3.9/cmake-3.9.2-Linux-x86_64.sh
+  - sudo sh cmake-3.9.2-Linux-x86_64.sh -- --skip-license --prefix=/usr
 
 script:
-  - cd $CI_HOME
-  - git submodule init
-  - git submodule update --init --recursive
-  - mkdir build && cd build
-  - cmake -DRPCLIB_ENABLE_COVERAGE=ON -DRPCLIB_BUILD_TESTS=ON ..
-  - make -j2
+  - mkdir build ; cd build
+  - cmake -DRPCLIB_ENABLE_COVERAGE=$COVERAGE -DRPCLIB_BUILD_TESTS=ON -DRPCLIB_CXX_STANDARD=$RPCLIB_CXX_STANDARD -DCMAKE_INSTALL_PREFIX=../install ..
+  - cmake --build . --config $BUILD_TYPE
+  - cmake --build . --target install
 
 after_success:
-  - ./output/bin/rpc_test
-  - cd ..
-  - coveralls --exclude dependencies --exclude test --exclude include/rpc/msgpack --exclude include/rcp/msgpack.hpp --gcov /usr/bin/gcov-5
-
-
+  - ./tests/rpc_test
+  - lcov --capture --directory . --output-file coverage.info
+  - bash <(curl -s https://codecov.io/bash)

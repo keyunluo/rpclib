@@ -8,7 +8,8 @@
 #include <memory>
 #include <unordered_map>
 
-#include "msgpack.hpp"
+#include "rpc/config.h"
+#include "rpc/msgpack.hpp"
 
 #include "rpc/detail/call.h"
 #include "rpc/detail/func_tools.h"
@@ -16,6 +17,7 @@
 #include "rpc/detail/log.h"
 #include "rpc/detail/not.h"
 #include "rpc/detail/response.h"
+#include "rpc/detail/make_unique.h"
 
 namespace rpc {
 
@@ -95,6 +97,8 @@ private:
     //! it is not the expected amount.
     static void enforce_arg_count(std::string const &func, std::size_t found,
                                   std::size_t expected);
+
+    void enforce_unique_name(std::string const &func);
 
     //! \brief Dispatches a call (which will have a response).
     detail::response dispatch_call(RPCLIB_MSGPACK::object const &msg,

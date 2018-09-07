@@ -9,8 +9,7 @@ namespace detail {
 using detail::response;
 
 void dispatcher::dispatch(RPCLIB_MSGPACK::sbuffer const &msg) {
-    RPCLIB_MSGPACK::unpacked unpacked;
-    RPCLIB_MSGPACK::unpack(&unpacked, msg.data(), msg.size());
+    auto unpacked = RPCLIB_MSGPACK::unpack(msg.data(), msg.size());
     dispatch(unpacked.get());
 }
 
@@ -29,11 +28,11 @@ response dispatcher::dispatch(RPCLIB_MSGPACK::object const &msg,
 response dispatcher::dispatch_call(RPCLIB_MSGPACK::object const &msg,
                                    bool suppress_exceptions) {
     call_t the_call;
-    msg.convert(&the_call);
+    msg.convert(the_call);
 
-    auto &&type = std::get<0>(the_call);
     // TODO: proper validation of protocol (and responding to it)
-    assert(type == 0);
+    // auto &&type = std::get<0>(the_call);
+    // assert(type == 0);
 
     auto &&id = std::get<1>(the_call);
     auto &&name = std::get<2>(the_call);
@@ -88,11 +87,11 @@ response dispatcher::dispatch_call(RPCLIB_MSGPACK::object const &msg,
 response dispatcher::dispatch_notification(RPCLIB_MSGPACK::object const &msg,
                                            bool suppress_exceptions) {
     notification_t the_call;
-    msg.convert(&the_call);
+    msg.convert(the_call);
 
-    auto &&type = std::get<0>(the_call);
     // TODO: proper validation of protocol (and responding to it)
-    assert(type == static_cast<uint8_t>(request_type::notification));
+    // auto &&type = std::get<0>(the_call);
+    // assert(type == static_cast<uint8_t>(request_type::notification));
 
     auto &&name = std::get<1>(the_call);
     auto &&args = std::get<2>(the_call);
@@ -128,6 +127,15 @@ void dispatcher::enforce_arg_count(std::string const &func, std::size_t found,
                 "Function '{0}' was called with an invalid number of "
                 "arguments. Expected: {1}, got: {2}",
                 func, expected, found));
+    }
+}
+
+void dispatcher::enforce_unique_name(std::string const &func) {
+    auto pos = funcs_.find(func);
+    if (pos != end(funcs_)) {
+        throw std::logic_error(
+            RPCLIB_FMT::format("Function name already bound: '{}'. "
+                               "Please use unique function names", func));
     }
 }
 

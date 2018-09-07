@@ -1,18 +1,22 @@
-# Getting started
-
 This chapter details the steps of getting everything in place to be able to use `rpclib`.
 
 ## What you need
 
 ### Compiler
 
-`rpclib` uses some C++14 features, and as such, requires a recent compiler. The following compilers are tried and tested with `rpclib` at the moment:
+`rpclib` is compatible with C++11, but it's also able to take advantage of C++14 if the compiler
+supports it. At the moment, the oldest versions of the major compilers that are known to work
+are the following:
 
-  * g++ 5.0
+  * g++ 4.8
   * clang++ 3.7
   * MSVC 2015 Update 3
 
 Newer versions of these compilers are expected to work, of course.
+
+Since C++11 support was introduced, it might be possible to compile rpclib with even older compilers.
+If it builds and the unit tests run without an error then it should be fine to use (please report older compilers
+that do compile but produce failing unit tests to the issue tracker!)
 
 ### Tools
 
